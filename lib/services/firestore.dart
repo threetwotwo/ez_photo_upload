@@ -33,7 +33,7 @@ class FirestoreService {
   static Future<void> uploadToAlbum(Album album) async {
     final user = await Auth.currentUser();
     final ref = albumRef(user.uid, album.albumId);
-    return ref.setData(album.toMap());
+    return ref.setData(album.toMap(), merge: true);
   }
 
   static Future<void> updateProfilePhoto(String url) async {

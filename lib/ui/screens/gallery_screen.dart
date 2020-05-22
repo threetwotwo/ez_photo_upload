@@ -3,7 +3,9 @@ import 'package:ezphotoupload/models/album.dart';
 import 'package:ezphotoupload/services/auth.dart';
 import 'package:ezphotoupload/services/cloud_storage.dart';
 import 'package:ezphotoupload/services/firestore.dart';
+import 'package:ezphotoupload/ui/screens/edit_album_screen.dart';
 import 'package:ezphotoupload/ui/shared/safe_scaffold.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 class GalleryScreen extends StatefulWidget {
@@ -105,7 +107,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
                   child: isDeleting
                       ? Center(child: CircularProgressIndicator())
                       : FlatButton(
-                          onPressed: _delete,
+                          onPressed: () => _showDialog(context),
                           child: Text(
                             'Delete',
                             style: TextStyle(color: Colors.red),
@@ -128,7 +130,12 @@ class _GalleryScreenState extends State<GalleryScreen> {
                 child: Align(
                   alignment: Alignment.centerRight,
                   child: FlatButton(
-                    onPressed: () {},
+                    onPressed: () async {
+                      await Navigator.maybePop(context);
+
+                      return Navigator.of(context)
+                          .push(EditAlbumScreen.route(widget.album));
+                    },
                     child: Text(
                       'Edit',
                       style: TextStyle(color: Colors.white),
@@ -143,7 +150,29 @@ class _GalleryScreenState extends State<GalleryScreen> {
     );
   }
 
-  void _delete() async {
+  void _showDialog(BuildContext context) {
+    showCupertinoDialog(
+      context: context,
+      builder: (context) {
+        return CupertinoAlertDialog(
+          content: Text('Delete Album?'),
+          actions: <Widget>[
+            CupertinoDialogAction(
+              onPressed: () => Navigator.of(context).maybePop(),
+              child: Text('Cancel'),
+            ),
+            CupertinoDialogAction(
+              onPressed: _deleteAlbum,
+              child: Text('Delete'),
+              isDefaultAction: true,
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _deleteAlbum() async {
     setState(() {
       isDeleting = true;
     });
@@ -155,6 +184,6 @@ class _GalleryScreenState extends State<GalleryScreen> {
     setState(() {
       isDeleting = false;
     });
-    return Navigator.of(context).pop();
+    return Navigator.of(context).popUntil((route) => route.isFirst);
   }
 }

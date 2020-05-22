@@ -27,7 +27,6 @@ dependencies:
   multi_image_picker: ^4.6.7
   cached_network_image: ^2.2.0+1
 
-
   #Firebase plugins
   firebase_core: ^0.4.4+3
   cloud_firestore: ^0.13.5

@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ezphotoupload/models/album.dart';
+import 'package:ezphotoupload/models/photo.dart';
 import 'package:ezphotoupload/services/auth.dart';
 import 'package:ezphotoupload/services/cloud_storage.dart';
 import 'package:ezphotoupload/services/firestore.dart';
@@ -13,21 +14,21 @@ import 'package:flutter/material.dart';
 import 'package:multi_image_picker/multi_image_picker.dart';
 
 class UploadScreen extends StatefulWidget {
-  final List<Asset> initialPhotos;
+  final List<Asset> initialAssets;
 
   static MaterialPageRoute route(List<Asset> photos) => MaterialPageRoute(
       builder: (_) => UploadScreen(
-            initialPhotos: photos,
+            initialAssets: photos,
           ));
 
-  const UploadScreen({Key key, this.initialPhotos}) : super(key: key);
+  const UploadScreen({Key key, this.initialAssets}) : super(key: key);
 
   @override
   _UploadScreenState createState() => _UploadScreenState();
 }
 
 class _UploadScreenState extends State<UploadScreen> {
-  List<Asset> photos = [];
+  List<Photo> photos = [];
 
   List<StorageUploadTask> tasks = [];
 
@@ -43,8 +44,7 @@ class _UploadScreenState extends State<UploadScreen> {
 
   @override
   void initState() {
-    photos.addAll(widget.initialPhotos);
-
+    photos.addAll(Photo.fromAssets(widget.initialAssets));
     super.initState();
   }
 
@@ -138,12 +138,13 @@ class _UploadScreenState extends State<UploadScreen> {
 
   Future<void> _addMorePhotos() async {
     try {
-      final result = await MultiImagePicker.pickImages(maxImages: 20)
-        ..removeWhere((element) => photos.contains(photos
-            .firstWhere((p) => p.name == element.name, orElse: () => null)));
+      final result = await MultiImagePicker.pickImages(maxImages: 40)
+        ..removeWhere((element) => photos.contains(photos.firstWhere(
+            (p) => p.asset.name == element.name,
+            orElse: () => null)));
 
       setState(() {
-        photos.insertAll(0, result);
+        photos.insertAll(0, Photo.fromAssets(result));
       });
     } catch (e) {
       print(e);
@@ -151,7 +152,7 @@ class _UploadScreenState extends State<UploadScreen> {
   }
 
   Future<void> _upload() async {
-    if (photos.length < 4) {
+    if (photos.length < 10) {
       showCupertinoDialog(
           context: context,
           builder: (context) => CupertinoAlertDialog(
@@ -171,7 +172,8 @@ class _UploadScreenState extends State<UploadScreen> {
 
       final user = await Auth.currentUser();
       final ref = FirestoreService.createAlbumRef(user.uid);
-      final result = await CloudStorage.uploadPhotos(ref.documentID, photos);
+      final result = await CloudStorage.uploadPhotos(
+          ref.documentID, photos.map((e) => e.asset).toList());
       setState(() {
         tasks = result;
       });

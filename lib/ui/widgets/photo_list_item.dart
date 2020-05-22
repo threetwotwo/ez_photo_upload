@@ -1,11 +1,11 @@
-import 'dart:typed_data';
-
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:ezphotoupload/models/photo.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:multi_image_picker/multi_image_picker.dart';
 
 class PhotoListItem extends StatelessWidget {
-  final Asset photo;
+  final Photo photo;
   final int index;
   final VoidCallback onDelete;
   final VoidCallback onRefresh;
@@ -57,21 +57,28 @@ class PhotoListItem extends StatelessWidget {
             ),
             Padding(
               padding: const EdgeInsets.all(8.0),
-              child: SizedBox(
-                height: 96,
-                width: 96,
-                child: AssetThumb(
-                  height: 96,
-                  width: 96,
-                  asset: photo,
-                  spinner: Container(
-                    height: 96,
-                    width: 96,
-                    color: Colors.grey[300],
-                    child: CupertinoActivityIndicator(),
-                  ),
-                ),
-              ),
+              child: photo.url == null || photo.url.isEmpty
+                  ? SizedBox(
+                      height: 96,
+                      width: 96,
+                      child: AssetThumb(
+                        height: 96,
+                        width: 96,
+                        asset: photo.asset,
+                        spinner: Container(
+                          height: 96,
+                          width: 96,
+                          color: Colors.grey[300],
+                          child: CupertinoActivityIndicator(),
+                        ),
+                      ),
+                    )
+                  : CachedNetworkImage(
+                      width: 96,
+                      height: 96,
+                      imageUrl: photo.url,
+                      fit: BoxFit.cover,
+                    ),
             ),
             Expanded(
               child: Padding(
@@ -86,11 +93,12 @@ class PhotoListItem extends StatelessWidget {
                         style: TextStyle(color: Colors.yellow[700]),
                       ),
                     Text(
-                      photo.name,
+                      photo.asset?.name ?? photo.url ?? '',
+                      maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                     ),
                     SizedBox(height: 4),
-                    !isUploading
+                    !isUploading || photo.url != null
                         ? SizedBox()
                         : uploadProgress >= 1.0
                             ? Text(
