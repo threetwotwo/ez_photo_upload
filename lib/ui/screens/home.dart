@@ -20,7 +20,12 @@ class _HomeState extends State<Home> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _tabIndex,
         onTap: (val) {
-          print('_HomeState.build $val');
+          if (val == 0 && val == _tabIndex) {
+            if (feedController.hasClients)
+              feedController.animateTo(0,
+                  duration: Duration(milliseconds: 300),
+                  curve: Curves.easeInOut);
+          }
           setState(() {
             _tabIndex = val;
           });

@@ -2,12 +2,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ezphotoupload/models/album.dart';
 import 'package:ezphotoupload/services/auth.dart';
 import 'package:ezphotoupload/services/firestore.dart';
-import 'package:ezphotoupload/styles.dart';
 import 'package:ezphotoupload/ui/screens/upload_screen.dart';
 import 'package:ezphotoupload/ui/shared/action_button.dart';
 import 'package:ezphotoupload/ui/shared/safe_scaffold.dart';
 import 'package:ezphotoupload/ui/widgets/album_grid_item.dart';
-import 'package:ezphotoupload/ui/widgets/photo_list_item.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:multi_image_picker/multi_image_picker.dart';
@@ -51,6 +49,7 @@ class _FeedScreenState extends State<FeedScreen> {
                   final docs = snapshot.data.documents;
 
                   return ListView(
+                    controller: widget.controller,
                     children: <Widget>[
                       ListTile(
                         title: Text('My Albums (${docs.length})'),
