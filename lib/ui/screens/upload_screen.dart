@@ -1,7 +1,13 @@
-import 'package:ezphotoupload/ui/screens/confirm_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:ezphotoupload/models/album.dart';
+import 'package:ezphotoupload/services/auth.dart';
+import 'package:ezphotoupload/services/cloud_storage.dart';
+import 'package:ezphotoupload/services/firestore.dart';
+import 'package:ezphotoupload/ui/screens/gallery_screen.dart';
 import 'package:ezphotoupload/ui/shared/action_button.dart';
 import 'package:ezphotoupload/ui/shared/safe_scaffold.dart';
 import 'package:ezphotoupload/ui/widgets/photo_list_item.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:multi_image_picker/multi_image_picker.dart';
@@ -22,6 +28,18 @@ class UploadScreen extends StatefulWidget {
 
 class _UploadScreenState extends State<UploadScreen> {
   List<Asset> photos = [];
+
+  List<StorageUploadTask> tasks = [];
+
+  List<String> downloadUrls = [];
+
+  bool isUploading = false;
+
+  bool isFinished = false;
+
+  Album _album;
+
+  final titleController = TextEditingController();
 
   @override
   void initState() {
@@ -47,14 +65,24 @@ class _UploadScreenState extends State<UploadScreen> {
                 },
                 header: Column(
                   children: <Widget>[
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: TextField(
+                        controller: titleController,
+                        decoration:
+                            InputDecoration(hintText: 'Enter Album Title'),
+                      ),
+                    ),
                     ListTile(
                       title: Text('Photos (${photos.length})',
                           style: TextStyle(fontSize: 18)),
-                      trailing: OutlineActionButton(
-                        onPressed: _addMorePhotos,
-                        title: 'Add photo',
-                        icon: Icons.add_to_photos,
-                      ),
+                      trailing: isFinished || isUploading
+                          ? SizedBox()
+                          : OutlineActionButton(
+                              onPressed: _addMorePhotos,
+                              title: 'Add photo',
+                              icon: Icons.add_to_photos,
+                            ),
                     ),
                   ],
                 ),
@@ -69,47 +97,22 @@ class _UploadScreenState extends State<UploadScreen> {
                           ),
                         )
                       ]
-                    : <Widget>[
-                        for (final photo in photos)
-                          PhotoListItem(
-                            key: ValueKey(photo),
-                            uploadProgress: 0.6,
-                            index: photos.indexOf(photo) + 1,
-                            photo: photo,
-                            onDelete: () {
-                              setState(() {
-                                photos.remove(photo);
-                              });
-                            },
-                            onRefresh: () {
-                              setState(() {
-                                photos[photos.indexOf(photo)] = photo;
-                              });
-                            },
-                            onMoveUp: () {
-                              final index = photos.indexOf(photo);
-                              return index == 0
-                                  ? null
-                                  : _reorder(index, index - 1);
-                            },
-                            onMoveDown: () {
-                              final index = photos.indexOf(photo);
-                              return index == photos.length - 1
-                                  ? null
-                                  : _reorder(index, index + 2);
-                            },
-                          )
-                      ],
+                    : _buildItems(),
               ),
             ),
           ),
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: ActionButton(
-              onPressed: () {
-                Navigator.of(context).push(ConfirmScreen.route(photos));
-              },
-              title: 'Next',
+              onPressed: isFinished
+                  ? () async {
+                      await Navigator.of(context).maybePop();
+                      if (_album != null) GalleryScreen.show(context, _album);
+                    }
+                  : _upload,
+              isLoading: isUploading,
+              color: isFinished ? Colors.greenAccent[700] : null,
+              title: isFinished ? 'Finish' : 'Upload',
             ),
           ),
         ],
@@ -147,8 +150,8 @@ class _UploadScreenState extends State<UploadScreen> {
     }
   }
 
-  void _upload() {
-    if (photos.length < 10) {
+  Future<void> _upload() async {
+    if (photos.length < 4) {
       showCupertinoDialog(
           context: context,
           builder: (context) => CupertinoAlertDialog(
@@ -161,6 +164,81 @@ class _UploadScreenState extends State<UploadScreen> {
                   )
                 ],
               ));
+    } else {
+      setState(() {
+        isUploading = true;
+      });
+
+      final user = await Auth.currentUser();
+      final ref = FirestoreService.createAlbumRef(user.uid);
+      final result = await CloudStorage.uploadPhotos(ref.documentID, photos);
+      setState(() {
+        tasks = result;
+      });
+
+      final urls = await CloudStorage.getDownloadUrls(tasks);
+
+      setState(() {
+        isUploading = false;
+        downloadUrls = List<String>.from(urls);
+      });
+
+      final album = Album(
+          albumId: ref.documentID,
+          title: titleController.text.trim(),
+          photoUrls: downloadUrls,
+          createdAt: Timestamp.now());
+      FirestoreService.uploadToAlbum(album);
+
+      setState(() {
+        _album = album;
+        isFinished = true;
+      });
     }
+  }
+
+  List<Widget> _buildItems() {
+    return photos.asMap().entries.map((e) {
+      final index = e.key;
+      final photo = e.value;
+      return IgnorePointer(
+        key: ValueKey(photo),
+        ignoring: isUploading || isFinished,
+        child: StreamBuilder<StorageTaskEvent>(
+            stream: tasks.isEmpty ? null : tasks[index].events,
+            builder: (context, snapshot) {
+              final event = snapshot?.data?.snapshot;
+              double progressPercent = event != null
+                  ? event.bytesTransferred / event.totalByteCount
+                  : 0;
+
+              return PhotoListItem(
+                uploadProgress: progressPercent,
+                isUploading: isUploading,
+                isFinished: isFinished,
+                index: index + 1,
+                photo: photo,
+                onDelete: () {
+                  setState(() {
+                    photos.remove(photo);
+                  });
+                },
+                onRefresh: () {
+                  setState(() {
+                    photos[index] = photo;
+                  });
+                },
+                onMoveUp: () {
+                  return index == 0 ? null : _reorder(index, index - 1);
+                },
+                onMoveDown: () {
+                  return index == photos.length - 1
+                      ? null
+                      : _reorder(index, index + 2);
+                },
+              );
+            }),
+      );
+    }).toList();
   }
 }

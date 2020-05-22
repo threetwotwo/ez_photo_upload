@@ -1,8 +1,14 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:ezphotoupload/models/album.dart';
+import 'package:ezphotoupload/services/auth.dart';
+import 'package:ezphotoupload/services/firestore.dart';
 import 'package:ezphotoupload/styles.dart';
 import 'package:ezphotoupload/ui/screens/upload_screen.dart';
 import 'package:ezphotoupload/ui/shared/action_button.dart';
 import 'package:ezphotoupload/ui/shared/safe_scaffold.dart';
+import 'package:ezphotoupload/ui/widgets/album_grid_item.dart';
 import 'package:ezphotoupload/ui/widgets/photo_list_item.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:multi_image_picker/multi_image_picker.dart';
 
@@ -16,8 +22,6 @@ class FeedScreen extends StatefulWidget {
 }
 
 class _FeedScreenState extends State<FeedScreen> {
-  List<Asset> photos = [];
-
   @override
   Widget build(BuildContext context) {
     return SafeScaffold(
@@ -27,42 +31,71 @@ class _FeedScreenState extends State<FeedScreen> {
         actions: <Widget>[
           IconButton(
             icon: Icon(Icons.add_to_photos),
-            onPressed: () async {
-              final images = await MultiImagePicker.pickImages(maxImages: 10);
-              setState(() {
-                photos = images;
-              });
-            },
+            onPressed: _pickPhotos,
           )
         ],
       ),
-      child: Center(
-        child: photos.isEmpty
-            ? Column(
-                mainAxisSize: MainAxisSize.max,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: <Widget>[
-                  Icon(Icons.photo_album, size: 128),
-                  Text('You do not have any photo albums'),
-                  SizedBox(height: 16),
-                  ActionButton(onPressed: _pickPhotos, title: 'Create Album'),
-                ],
-              )
-            : ListView.builder(
-                controller: widget.controller,
-                itemCount: photos.length,
-                itemBuilder: (_, index) {
-                  final photo = photos[index];
+      child: FutureBuilder<FirebaseUser>(
+          future: Auth.currentUser(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) return CircularProgressIndicator();
 
-                  return PhotoListItem(
-                    photo: photo,
-                    onDelete: () {
-                      print('_FeedScreenState.build');
-                    },
+            final user = snapshot.data;
+
+            return StreamBuilder<QuerySnapshot>(
+                stream: FirestoreService.albumsStream(user.uid),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData)
+                    return Center(child: CircularProgressIndicator());
+
+                  final docs = snapshot.data.documents;
+
+                  return ListView(
+                    children: <Widget>[
+                      ListTile(
+                        title: Text('My Albums (${docs.length})'),
+                      ),
+                      Divider(),
+                      Center(
+                          child: docs.isEmpty
+                              ? Padding(
+                                  padding: const EdgeInsets.all(8.0),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.max,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: <Widget>[
+                                      Icon(Icons.photo_album, size: 128),
+                                      Text('You do not have any photo albums'),
+                                      SizedBox(height: 16),
+                                      ActionButton(
+                                          onPressed: _pickPhotos,
+                                          title: 'Create Album'),
+                                    ],
+                                  ),
+                                )
+                              : Padding(
+                                  padding: const EdgeInsets.all(8.0),
+                                  child: GridView.builder(
+                                    shrinkWrap: true,
+                                    itemCount: docs.length,
+                                    physics: NeverScrollableScrollPhysics(),
+                                    gridDelegate:
+                                        SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 2,
+                                      crossAxisSpacing: 2,
+                                      mainAxisSpacing: 2,
+                                    ),
+                                    itemBuilder: (_, index) {
+                                      final doc = docs[index];
+                                      return AlbumGridItem(
+                                          album: Album.fromDoc(doc));
+                                    },
+                                  ),
+                                )),
+                    ],
                   );
-                },
-              ),
-      ),
+                });
+          }),
     );
   }
 
