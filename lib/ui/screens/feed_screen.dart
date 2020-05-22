@@ -100,11 +100,10 @@ class _FeedScreenState extends State<FeedScreen> {
 
   Future _pickPhotos() async {
     try {
-      final images = await MultiImagePicker.pickImages(maxImages: 10);
+      final images = await MultiImagePicker.pickImages(maxImages: 100);
       return Navigator.of(context).push(UploadScreen.route(images));
     } catch (e) {
       print(e);
     }
-//    return Navigator.of(context).push(FeedScreen());
   }
 }

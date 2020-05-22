@@ -219,7 +219,7 @@ class _EditAlbumScreenState extends State<EditAlbumScreen> {
 
   Future<void> _addMorePhotos() async {
     try {
-      final result = await MultiImagePicker.pickImages(maxImages: 40)
+      final result = await MultiImagePicker.pickImages(maxImages: 100)
         ..removeWhere((element) => photos.contains(photos.firstWhere(
             (p) => p.asset == null ? false : p.asset.name == element.name,
             orElse: () => null)));

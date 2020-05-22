@@ -138,7 +138,7 @@ class _UploadScreenState extends State<UploadScreen> {
 
   Future<void> _addMorePhotos() async {
     try {
-      final result = await MultiImagePicker.pickImages(maxImages: 40)
+      final result = await MultiImagePicker.pickImages(maxImages: 100)
         ..removeWhere((element) => photos.contains(photos.firstWhere(
             (p) => p.asset.name == element.name,
             orElse: () => null)));
